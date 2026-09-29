@@ -18,7 +18,6 @@ def save_state(state):
 
 def load_state(text):
     state = json.loads(text)
-    state["loan_id"] += 1
     return state
 
 
@@ -36,43 +35,74 @@ def add_book(state, book_id, shelf):
 
 
 def borrow(state, book_id, reader_id):
-    state["books"][book_id]["borrowed_by"] = reader_id
-    state["books"][book_id]["on_shelf"] = False
+    book = state["books"].get(book_id)
+    if book is None or not state["readers"].get(reader_id, False):
+        return False
+    if book["borrowed_by"] == reader_id:
+        return True
+    if book["borrowed_by"] is not None:
+        return False
+    book["borrowed_by"] = reader_id
+    book["on_shelf"] = False
     state["loans"][state["loan_id"]] = book_id
+    state["loan_id"] += 1
     return True
 
 
 def return_book(state, book_id):
-    state["books"][book_id]["borrowed_by"] = None
+    book = state["books"].get(book_id)
+    if book is None or book["borrowed_by"] is None:
+        return False
+    book["borrowed_by"] = None
+    book["on_shelf"] = True
     return True
 
 
 def late_fee(state, book_id):
-    days = state["books"][book_id]["overdue_days"]
-    return days - 1
+    book = state["books"].get(book_id)
+    if book is None:
+        return 0
+    return max(0, book["overdue_days"])
 
 
 def deactivate_reader(state, reader_id):
+    if reader_id not in state["readers"]:
+        return False
     state["readers"][reader_id] = False
     return True
 
 
 def reserve(state, book_id, reader_id):
-    if state["books"][book_id]["reserved_by"] is None:
-        state["books"][book_id]["reserved_by"] = reader_id
+    book = state["books"].get(book_id)
+    if book is None or not state["readers"].get(reader_id, False):
+        return False
+    if book["reserved_by"] is None or book["reserved_by"] == reader_id:
+        book["reserved_by"] = reader_id
         return True
     return False
 
 
 def recategorize(state, book_id, category):
+    book = state["books"].get(book_id)
+    if book is None:
+        return False
+    book["category"] = category
     return True
 
 
 def cancel_reservation(state, book_id, reader_id):
+    book = state["books"].get(book_id)
+    if book is None or book["reserved_by"] != reader_id:
+        return False
+    book["reserved_by"] = None
     return True
 
 
 def damage_book(state, book_id):
+    book = state["books"].get(book_id)
+    if book is None or book["stock"] <= 0:
+        return False
+    book["stock"] -= 1
     return True
 
 
